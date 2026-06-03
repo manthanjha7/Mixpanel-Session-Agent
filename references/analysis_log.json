@@ -1,0 +1,5 @@
+{
+  "schema_version": "1.0",
+  "description": "Memory of past Mixpanel session analyses run by this skill. Used to avoid re-analyzing sessions that have already been looked at. The 'latest_analyzed_session_date' for each user is the MAXIMUM session date across ALL past analyses for that user (NOT the analysis date) — so if a Mar 16–Apr 7 range was analyzed yesterday and today a 4-day-past session is re-analyzed, latest_analyzed_session_date stays at Apr 7. When deciding whether to re-pull a date range, compare the requested range to latest_analyzed_session_date and only fetch sessions newer than that, unless explicitly asked for a redo.",
+  "users": {}
+}

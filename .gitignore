@@ -1,0 +1,27 @@
+# Outputs from analysis runs — never commit (may contain customer data)
+*_session_analysis.md
+*_session_analysis.xlsx
+*_raw.json
+outputs/
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+
+# Local-only configuration / secrets — never commit
+.env
+.env.*
+*.local
+
+# Populated analysis log — keep the template, ignore real customer data
+# (Comment this out if you want to commit the log to a private fork)
+# references/analysis_log.json

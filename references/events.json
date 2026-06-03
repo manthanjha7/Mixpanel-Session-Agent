@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0",
+  "last_updated": "YYYY-MM-DD",
+  "source": "Document where this dictionary came from (e.g., 'confirmed by PM via session-analysis investigation YYYY-MM-DD; backfilled from frontend code audit')",
+  "project_id": 0,
+  "project_name": "your-project-name (e.g., app-prod)",
+
+  "_INSTRUCTIONS": "Replace this with your product's real event dictionary. Each event you want narrated should have an entry. The placeholder entries below show the full schema — copy the shape and fill in your own events. Delete the _INSTRUCTIONS key when done.",
+
+  "events": {
+    "<example_session_start_event>": {
+      "module": "auth",
+      "meaning": "Describe what triggers this event in your product (e.g., 'OAuth callback step. Fires immediately after user signs in via SSO').",
+      "narrative_template": "The user signed in",
+      "fires_only_on_session_start": true,
+      "key_properties": [],
+      "property_semantics": {}
+    },
+
+    "Page Viewed": {
+      "module": "generic",
+      "meaning": "Generic page-view event. Often fires alongside more specific page-view events at the same epoch second. Usually safe to skip in narrative if a more specific event fires within 1 second.",
+      "narrative_template": null,
+      "skip_if_followed_by": [
+        "<List your specific page-view events here, e.g. Home Page Viewed, Settings Page Viewed>"
+      ],
+      "key_properties": ["page_url", "referrer"],
+      "property_semantics": {
+        "page_url": {
+          "type": "string",
+          "values": "current URL path",
+          "narrative_impact": "HIGH",
+          "meaning": "Which page the user landed on. Path shape often decides the narration."
+        },
+        "referrer": {
+          "type": "string",
+          "values": "previous URL path",
+          "narrative_impact": "LOW",
+          "meaning": "Structured log metadata — not for narrative."
+        }
+      }
+    },
+
+    "<example_primary_action_event>": {
+      "module": "<your_module_name>",
+      "meaning": "Describe what user action triggers this event (e.g., 'User submitted a chat message / placed an order / opened a record').",
+      "narrative_template": "The user submitted a query: _\"{query}\"_",
+      "narrative_template_follow_up": "The user submitted a follow-up query: _\"{query}\"_",
+      "key_properties": ["query", "is_follow_up", "<other_high_signal_property>"],
+      "interpretation_hint": "When two narrative templates exist, pick based on the HIGH property (here: is_follow_up). The event's own property wins over heuristics.",
+      "property_semantics": {
+        "query": {
+          "type": "string",
+          "values": "free text",
+          "narrative_impact": "HIGH",
+          "meaning": "Fill the {query} placeholder in the narrative template. Truncation in Mixpanel is a known platform limit, not a UI bug — do not flag it."
+        },
+        "is_follow_up": {
+          "type": "boolean",
+          "narrative_impact": "HIGH",
+          "meaning": "Decides which narrative_template variant to use."
+        }
+      }
+    },
+
+    "<example_toast_or_snackbar_event>": {
+      "module": "shared",
+      "meaning": "Toast notification. Used across many surfaces.",
+      "narrative_template": "{variant_emoji} **\"{toast_title}\"** appeared",
+      "key_properties": ["toast_title", "variant"],
+      "property_semantics": {
+        "toast_title": {
+          "type": "string",
+          "narrative_impact": "HIGH",
+          "meaning": "The user-visible message. Always include verbatim in narrative."
+        },
+        "variant": {
+          "type": "string",
+          "values": "success | error | destructive | info",
+          "narrative_impact": "HIGH",
+          "meaning": "Maps to emoji: success → ✅, error/destructive → ❌, info → ℹ️."
+        }
+      }
+    }
+  },
+
+  "bug_patterns": {
+    "_INSTRUCTIONS": "Each bug pattern is a deterministic detector run after data is pulled. Delete this key in your real file.",
+
+    "filter_cascade": {
+      "description": "Single click on a parent filter selects all sub-items at once. User then has to uncheck them one-by-one.",
+      "detector": {
+        "event": "Filter Applied",
+        "min_events": 3,
+        "max_window_seconds": 2,
+        "condition": "filter_values arrays shrink monotonically across consecutive events"
+      },
+      "narrative_template": "⚠️ BUG DETECTED: The user clicked a single filter, but the system selected all sub-items at once. They had to uncheck them one-by-one over {window_seconds}s to isolate the one they wanted."
+    },
+
+    "repeated_error_toasts": {
+      "description": "Multiple error/destructive toasts for the same user in a single session indicates the product is failing them repeatedly.",
+      "detector": {
+        "event": "<your_toast_event_name>",
+        "property": "variant",
+        "property_values": ["error", "destructive"],
+        "min_count_per_session": 2
+      },
+      "narrative_template": "⚠️ PATTERN: The user hit {count} error toasts in this session — product is failing them repeatedly."
+    },
+
+    "rapid_fire_same_event": {
+      "description": "≥4 of the same event in <5 seconds — possible UI feedback loop or accidental clicks.",
+      "detector": {
+        "min_events": 4,
+        "max_window_seconds": 5,
+        "same_event_name": true
+      },
+      "narrative_template": "⚠️ PATTERN: {event_name} fired {count} times in {window_seconds}s — UI loop or accidental clicks."
+    }
+  },
+
+  "noise_rules": {
+    "_INSTRUCTIONS": "Rules for what to collapse or skip during narration.",
+    "skip_in_narrative": [
+      "<list events that are pure render telemetry, e.g. Chart Loaded, Page Render Timing>"
+    ],
+    "collapse_consecutive": [
+      {
+        "event": "<event_name>",
+        "narrative": "opened {count} items in succession"
+      }
+    ]
+  }
+}

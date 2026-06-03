@@ -1,0 +1,27 @@
+{
+  "user_name": "Jane Doe",
+  "email": "jane@example.com",
+  "organization": "Example Co",
+  "role": "Admin",
+  "analysis_date": "2026-06-03",
+  "date_range_requested": "2026-05-20 to 2026-06-01",
+  "method": "1-day chunks",
+  "sessions_analyzed": [
+    {
+      "date": "2026-05-20",
+      "replay_id": "replay-abc-123",
+      "event_count": 18,
+      "summary": "User landed on home, ran two queries, opened a detail page, exported a result.",
+      "agents_used": ["Example Agent A"],
+      "snackbars": []
+    },
+    {
+      "date": "2026-05-28",
+      "replay_id": "replay-def-456",
+      "event_count": 42,
+      "summary": "Long session — hit filter cascade bug on a multi-select filter.",
+      "agents_used": ["Example Agent A", "Example Agent B"],
+      "snackbars": [{"variant": "error", "toast_title": "Connection Error"}]
+    }
+  ]
+}
