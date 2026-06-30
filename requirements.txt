@@ -1,0 +1,2 @@
+# scripts/pull_events.py
+requests>=2.28

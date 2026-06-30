@@ -17,10 +17,14 @@ venv/
 .vscode/
 *.swp
 
-# Local-only configuration / secrets — never commit
+# Local-only configuration / secrets, never commit
 .env
 .env.*
+!.env.example
 *.local
+
+# Raw export output
+*.ndjson
 
 # Populated analysis log — keep the template, ignore real customer data
 # (Comment this out if you want to commit the log to a private fork)
