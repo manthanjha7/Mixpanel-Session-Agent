@@ -18,6 +18,7 @@ This skill exists because direct Mixpanel calls hit several traps that took mult
 4. Some event names are misleading (a "Context Menu" event might actually be a specific feature menu, not a generic right-click). The event dictionary in `references/events.json` is the source of truth for **your** product.
 5. Bugs manifest as event patterns (for example N rapid-fire `Filter Applied` events = a multi-select cascade bug). The skill detects these automatically using patterns you define.
 6. Re-analyzing sessions that have already been looked at wastes time. The skill consults `references/analysis_log.json` and only fetches sessions newer than the latest one already analyzed for that user, unless explicitly told to redo the full range.
+7. Replay events record intent, not outcome. An event that fires when a user opens an asynchronous result fires whether or not the result exists, so a narrative built on replay data alone will confidently describe content the user never received. Phase 3.5 resolves the click against your product's own database before anything is narrated.
 
 ## Before you use this skill
 
@@ -84,6 +85,19 @@ python3 scripts/pull_events.py --email user@org.com --from 2026-06-10 --to 2026-
 
 The script pulls one day per HTTP call, filters to the target identity client-side, sorts events chronologically, and writes NDJSON (one event per line). It prints per-day counts and the resolved identity id(s) to stderr. The full property bag is returned for every event, so there is no up-front property list to build and nothing has to be re-pulled to get a missing property.
 
+### Phase 3.5: Cross-reference the backing store (optional, strongly recommended)
+
+Replay events tell you what the user *did*. They are a poor record of what the product actually *returned*. Text is truncated, ids are frequently absent, and an event fires on the click regardless of whether the thing being opened exists. If you have read access to your product's own database, pull the durable records for the same user and window and narrate against both.
+
+Two things this buys you, both of which replay data alone will get wrong:
+
+1. **Attribution.** The backing store holds ids that replay events omit (which conversation a message belonged to, which record a view resolved to). Where the two disagree about grouping, the database is ground truth.
+2. **Outcome verification.** A click event is evidence of intent, not of result. If the user opened something that was supposed to contain generated or asynchronous content, only the stored row proves the content existed.
+
+Pull the rows keyed by the same user id and time window as the replay pull. If your product has an asynchronous "your result is ready" path (a notification, an email link, a deferred job), pull those rows too and keep the link between the notification row, the request that triggered it, and the record it points at.
+
+If the backing store is unavailable (no credentials, no read access, or no rows for the window), proceed with replay data only and say so in the output's caveats. Do not silently produce a narrative that looks equally confident.
+
 ### Phase 4: Know the property names you'll narrate
 
 This is the step that has burned past runs. Do not skip it.
@@ -110,6 +124,7 @@ For each event, look it up in `references/events.json`:
   - **MEDIUM:** mention when it adds clarity, but don't manufacture verbosity.
   - **LOW:** keep in the structured event log for debugging, do not include in the markdown narrative.
 - Apply the noise rules defined in `events.json` (skip duplicate `Page Viewed` events when a more specific page-view fires within 1 second, collapse consecutive repetitive clicks into a count, and so on).
+- **Resolve click-to-outcome before narrating a result.** When an event only records that the user opened or requested something (a notification, a deferred result, a generated response), do not narrate what they saw from surrounding context. Resolve it against the Phase 3.5 records first. If the target resolves to real stored content, narrate the content. If it does not, narrate the failure, that is the finding. Never invent the payload.
 
 ### Phase 7: Detect bug patterns
 
@@ -119,6 +134,7 @@ Common patterns the template ships with:
 - **Filter cascade:** 3 or more `Filter Applied` events within 2 seconds with monotonically shrinking `filter_values` arrays = multi-select cascade bug
 - **Repeated error toasts:** multiple error-variant toast/snackbar events for the same user in a session = product is failing them repeatedly
 - **Rapid-fire same event:** 4 or more of the same event in under 5 seconds = possible UI feedback loop or accidental clicks
+- **Promised content never arrived:** the user opened an asynchronous result (notification click, "view your result" link, deferred job callback) but no non-empty stored record resolves from it. The user was told something was ready and got nothing. Requires Phase 3.5 data to detect, replay events alone will show this as a successful click.
 
 ### Phase 8: Output
 
@@ -165,6 +181,8 @@ End each session narrative with "Then the session ended."
 - `references/product_modules.md`: context about your product's surfaces so narratives use the right product language.
 - `references/analysis_log.json`: memory of past analyses. Tracks which sessions have already been analyzed so the skill doesn't redo work.
 
+If you wired up Phase 3.5, also record where the backing-store records come from (the connection, the tables, the id that joins them to the Mixpanel `distinct_id`) so the next run does not have to rediscover it.
+
 ## Common mistakes to avoid
 
 1. **Don't pull replays through the `Get-User-Replays-Data` MCP tool.** It drops sessions and caps properties. Use `scripts/pull_events.py` (Raw Export API).
@@ -172,6 +190,7 @@ End each session narrative with "Then the session ended."
 3. **Don't guess property names.** Verify against the schema each run.
 4. **Don't trust the event name to mean what it sounds like.** Read the dictionary.
 5. **Don't narrate pure telemetry events** (chart-loaded, page-render-timing, and the like). Mark them `skip_in_narrative: true` in `events.json`.
-6. **Don't claim instrumentation is broken without checking another user first.** If an event is missing for one user, check whether it exists for another before filing it as a bug.
-7. **Don't re-analyze sessions already in the log unless asked.** Check `analysis_log.json` first.
-8. **Don't skip the cross-check.** If a Mixpanel UI screenshot is provided, verify session counts before narrating. If you can't, run an Insights count as a sanity check.
+6. **Don't treat a click as proof that what it opened existed.** An "opened the result" event fires whether or not there was a result. Resolve it to a stored record first. If that resolution fails, the missing content is the bug, report it instead of leaving the narrative vague.
+7. **Don't claim instrumentation is broken without checking another user first.** If an event is missing for one user, check whether it exists for another before filing it as a bug.
+8. **Don't re-analyze sessions already in the log unless asked.** Check `analysis_log.json` first.
+9. **Don't skip the cross-check.** If a Mixpanel UI screenshot is provided, verify session counts before narrating. If you can't, run an Insights count as a sanity check.

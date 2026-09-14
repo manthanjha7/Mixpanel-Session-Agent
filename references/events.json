@@ -117,6 +117,17 @@
         "same_event_name": true
       },
       "narrative_template": "⚠️ PATTERN: {event_name} fired {count} times in {window_seconds}s — UI loop or accidental clicks."
+    },
+
+    "promised_content_never_arrived": {
+      "description": "The user opened an asynchronous result — a notification click, a 'your result is ready' link, a deferred job callback — but no non-empty stored record resolves from it. The product said something was ready and delivered nothing. Replay events alone cannot detect this: the click fires identically whether or not content exists.",
+      "requires": "Phase 3.5 backing-store records, joined to the replay events on the notification/request id.",
+      "detector": {
+        "event": "<your_notification_or_result_opened_event>",
+        "resolve_via": "<the backing-store record that links the notification to its content>",
+        "condition": "no linked record exists, or the linked record's content field is empty or null"
+      },
+      "narrative_template": "⚠️ BUG DETECTED: The user opened a result the product said was ready, but no stored content resolves from it. The promised output was never delivered."
     }
   },
 
