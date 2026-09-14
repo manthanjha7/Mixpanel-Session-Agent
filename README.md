@@ -13,12 +13,13 @@ Given a single user (email or `distinct_id`) and a date range, the skill:
 1. Resolves the user against your Mixpanel project.
 2. Checks an on-disk analysis log so it doesn't re-pull sessions already analyzed.
 3. Pulls every event for that user from the **Mixpanel Raw Export API** (`scripts/pull_events.py`), one HTTP call per day, with the full property bag and complete, deterministic identity matching.
-4. Verifies event property names against your product's event dictionary before narrating.
-5. Cross-checks against an Insights-derived ground-truth count, or against a screenshot if you provide one.
-6. Narrates each session in plain English, using your product's vocabulary.
-7. Runs deterministic bug-pattern detectors (filter cascades, repeated error toasts, rapid-fire clicks).
-8. Outputs a markdown narrative, a structured event log, and raw JSON.
-9. Updates the analysis log so the next run is incremental.
+4. Optionally pulls the matching records from your product's own database, so the narrative can distinguish what the user clicked from what the product actually returned.
+5. Verifies event property names against your product's event dictionary before narrating.
+6. Cross-checks against an Insights-derived ground-truth count, or against a screenshot if you provide one.
+7. Narrates each session in plain English, using your product's vocabulary.
+8. Runs deterministic bug-pattern detectors (filter cascades, repeated error toasts, rapid-fire clicks, undelivered async results).
+9. Outputs a markdown narrative, a structured event log, and raw JSON.
+10. Updates the analysis log so the next run is incremental.
 
 The narrative reads like a PM walked through the replay, not like a dump of event names.
 
@@ -30,6 +31,7 @@ The narrative reads like a PM walked through the replay, not like a dump of even
 - A Mixpanel **project API secret** and **project id** (set in `.env`, see below).
 - A populated `references/events.json` describing **your** product's Mixpanel events. The repo ships a template with the full schema and placeholder entries, you fill it in once for your product.
 - An AI agent runtime that can read `SKILL.md` and run the scripts. The Mixpanel MCP server is optional and only used for the Phase 5 Insights cross-check, the replay pull does not need it.
+- Optionally, read access to your product's own database. Not required, but without it the skill cannot verify that asynchronous results the user opened actually contained anything.
 
 The skill does **not** ship with any API keys, tokens, or customer data. Your `.env` is gitignored.
 
@@ -79,7 +81,7 @@ Your product's event dictionary. For every event you want narrated, add an entry
 - `key_properties`: the top properties worth surfacing
 - `property_semantics`: per-property notes flagging `HIGH | MEDIUM | LOW` `narrative_impact` so the agent knows which ones must be read vs which are just for the structured log
 
-Also define `bug_patterns` (deterministic detectors) and `noise_rules` (events to collapse or skip). The template ships with three common bug patterns (filter cascade, repeated error toasts, rapid-fire same event), keep, modify, or remove them.
+Also define `bug_patterns` (deterministic detectors) and `noise_rules` (events to collapse or skip). The template ships with four common bug patterns (filter cascade, repeated error toasts, rapid-fire same event, promised content never arrived), keep, modify, or remove them. The last one needs the optional Phase 3.5 backing-store pull to fire, replay events alone cannot see it.
 
 ### 2. `references/product_modules.md`
 
@@ -136,6 +138,7 @@ Each phase of the workflow encodes a real failure mode:
 | Event names are misleading (a "Context Menu" event was actually one specific feature menu) | Encode the meaning in `events.json` rather than guessing from the name |
 | Same user analyzed repeatedly wastes time | Persistent `analysis_log.json` skips already-analyzed sessions |
 | Narratives that just list events read like garbage to a PM | `narrative_template` + `property_semantics` per event |
+| A narrative confidently described a result the user never actually received, because the "opened it" event fired either way | Resolve the click to a stored record in the product database before narrating the outcome (Phase 3.5). No record means the missing content *is* the finding |
 
 If you're running ad-hoc Mixpanel session analyses today, you've probably hit at least three of these. This skill is the codified version of the fix.
 
